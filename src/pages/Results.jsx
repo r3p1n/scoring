@@ -111,12 +111,12 @@ export default function Results() {
           <TableHead>
             <TableRow sx={{ backgroundColor: '#ddd' }}>
               <TableCell>Player</TableCell>
+              <TableCell align="right" sx={{ minWidth: '100px' }}>Total score</TableCell>
               <Show when={results().length > 0 && results()[0].scores}>
                 <For each={results()[0].scores}>
                   { score => <TableCell align="right" sx={{ minWidth: '100px' }}>Round { score.round_number }</TableCell> }
                 </For>
               </Show>
-              <TableCell align="right" sx={{ minWidth: '100px' }}>Total score</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -125,12 +125,12 @@ export default function Results() {
                 { p => (
                   <StyledTableRow>
                     <TableCell>{ p.name }</TableCell>
-                      <For each={p.scores}>
-                        { score => <TableCell align="right">{ score.score }</TableCell> }
-                      </For>
                     <TableCell align="right">
                       <strong>{ p.total_score }</strong>
                     </TableCell>
+                    <For each={p.scores}>
+                      { score => <TableCell align="right">{ score.score }</TableCell> }
+                    </For>
                   </StyledTableRow>
                 )}
               </For>

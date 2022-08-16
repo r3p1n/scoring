@@ -21,6 +21,7 @@ export default function NewRound() {
   const navigate = useNavigate()
   const [roundNumber, setRoundNumber] = createSignal(0)
   const [gameNotFound, setGameNotFound] = createSignal(false)
+  const [emptyScore, setEmptyScore] = createSignal(false)
   const [scores, setScores] = createStore([])
 
   onMount(async () => {
@@ -63,6 +64,12 @@ export default function NewRound() {
   }
 
   const saveRoundData = async (gameId) => {
+    let notEmpty = scores.find(s => s.score !== 0)
+    if (!notEmpty) {
+      setEmptyScore(true)
+      return false
+    }
+
     try {
       let result = await dbExec("INSERT INTO rounds (number, game_id) VALUES (?, ?)", [roundNumber(), gameId])
       let newRoundId = result.insertId
@@ -71,7 +78,9 @@ export default function NewRound() {
       })
     } catch (e) {
       console.error(e)
+      return false
     }
+    return true
   }
   
   const handlerChangeScores = id => event => {
@@ -79,10 +88,14 @@ export default function NewRound() {
     const lastRoundScore = scores.find(score => score.player_id === id).last_round_score
     setScores(score => score.player_id === id, 'score', newScore)
     setScores(score => score.player_id === id, 'total_score', lastRoundScore + newScore)
+    setEmptyScore(false)
   }
 
   const handlerClickFinishGame = async () => {
-    await saveRoundData(params.id)
+    const success = await saveRoundData(params.id)
+    if (!success) {
+      return
+    }
 
     try {
       await dbExec("UPDATE games SET finished_at = datetime('now') WHERE id = ?", [params.id])
@@ -95,7 +108,10 @@ export default function NewRound() {
   }
 
   const handlerClickNextRound = async () => {
-    await saveRoundData(params.id)
+    const success = await saveRoundData(params.id)
+    if (!success) {
+      return
+    }
     await getRound(params.id)
     await getScore(params.id)
   }
@@ -103,7 +119,7 @@ export default function NewRound() {
   return <>
     <Grid container alignContent="center" rowSpacing={2} sx={{ mt: 1 }}>
       <Grid item xs={12} container justifyContent="center">
-        <Typography id="modal-modal-title" variant="h4" component="h1">Round { roundNumber() }</Typography>
+        <Typography variant="h4" component="h1">Round { roundNumber() }</Typography>
       </Grid>
 
       <Grid item xs={12}>
@@ -135,6 +151,12 @@ export default function NewRound() {
         </Table>
       </Grid>
 
+      <Show when={emptyScore()}>
+        <Grid item xs={12} container justifyContent="center">
+          <Alert severity="error">Empty score</Alert>
+        </Grid>
+      </Show>
+
       <Show when={!gameNotFound()}
         fallback={
           <Grid item xs={12} container justifyContent="center">
@@ -143,7 +165,7 @@ export default function NewRound() {
         }
       >
         <Grid item xs={12} container justifyContent="center">
-          <Button onClick={ handlerClickNextRound } sx={{ minWidth: '200px', mb: 1 }} variant="contained">Next Round</Button>
+          <Button onClick={ handlerClickNextRound } sx={{ minWidth: '200px', mb: 1 }} variant="contained" color="success">Next Round</Button>
         </Grid>
 
         <Grid item xs={12} container justifyContent="center">

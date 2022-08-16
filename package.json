@@ -1,11 +1,10 @@
 {
   "name": "scoring",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "App for calc score",
   "scripts": {
-    "start": "vite",
-    "dev": "vite",
-    "build": "vite build --base=/scoring/",
+    "dev": "vite --mode dev",
+    "build": "vite build --base=/scoring/ --mode prod",
     "serve": "vite preview"
   },
   "license": "MIT",

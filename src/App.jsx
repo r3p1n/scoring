@@ -48,7 +48,7 @@ export default function App() {
       }
     >
       <CssBaseline />
-      <Container maxWidth="xs" sx={{ height: "100vh" }}>
+      <Container sx={{ height: "100vh" }}>
         <Routes />
       </Container>
     </Show>

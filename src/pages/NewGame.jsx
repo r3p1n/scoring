@@ -13,6 +13,8 @@ import Modal from '@suid/material/Modal'
 import Typography from '@suid/material/Typography'
 import TextField from '@suid/material/TextField'
 import Alert from '@suid/material/Alert'
+import IconButton from '@suid/material/IconButton'
+import EditIcon from '@suid/icons-material/Edit'
 
 import { dbExec } from '../websql'
 import { prefix } from '../router'
@@ -35,6 +37,7 @@ export default function NewGame() {
   const [checked, setChecked] = createSignal([])
   const [exception, setException] = createSignal(false)
   const [open, setOpen] = createSignal(false)
+  const [updateUserId, setUpdateUserId] = createSignal(null)
 
   onMount(async () => {
     try {
@@ -83,6 +86,7 @@ export default function NewGame() {
   const handleCloseModal = () => {
     setOpen(false)
     setPlayer('')
+    setUpdateUserId(null)
   }
 
   const handleClickAddPlayer = async () => {
@@ -99,29 +103,50 @@ export default function NewGame() {
     handleCloseModal()
   }
 
+  const handleClickModalEdit = (user) => () => {
+    setPlayer(user.name)
+    setUpdateUserId(user.id)
+    setOpen(true)
+  }
+
+  const handleClickEditPlayer = async () => {
+    try {
+      await dbExec("UPDATE users SET name = ? WHERE id = ?", [player(), updateUserId()])
+    } catch (e) {
+      console.error(e)
+      return
+    }
+    const updatedPlayer = { id: updateUserId(), name: player() }
+    setPlayers(players().map(p => p.id === updatedPlayer.id ? updatedPlayer : p))
+    handleCloseModal()
+  }
+
   return <>
     <Grid container alignContent="center" rowSpacing={2} sx={{ mt: 1 }}>
       <Grid item xs={12} container justifyContent="center">
-        <Typography id="modal-modal-title" variant="h4" component="h1">New game</Typography>
+        <Typography variant="h4" component="h1">New game</Typography>
       </Grid>
 
-      <Grid item xs={12}>
-        <Typography justifySelf="end">Players</Typography>
-        <Paper sx={{ width: '100%', maxHeight: '200px', overflow: 'auto' }} variant="outlined">
+      <Grid item xs={12} sx={{}}>
+        <Typography sx={{ maxWidth: '400px', margin: '0 auto' }}>Players</Typography>
+        <Paper sx={{ width: '100%', maxWidth: '400px', maxHeight: '200px', overflow: 'auto', margin: '0 auto' }} variant="outlined">
           <List dense sx={{ width: '100%', minHeight: '190px', bgcolor: 'background.paper' }}>
             { players().map((value) => {
               const labelId = `checkbox-list-secondary-label-${value.id}`
               return <>
-                <ListItem
-                  sx={{ height: '50px'}}
-                  disablePadding
+                <ListItem sx={{ height: '50px'}} disablePadding
+                  secondaryAction={
+                    <IconButton onClick={ handleClickModalEdit(value) } edge="end" color="primary">
+                      <EditIcon />
+                    </IconButton>
+                  }
                 >
                   <ListItemButton onClick={ handleClickToggle(value.id) }>
-                    <ListItemText primary={ value.name } />
-                    <Checkbox edge="end"
+                    <Checkbox edge="start"
                       checked={ checked().indexOf(value.id) !== -1 }
                       inputProps={{ 'aria-labelledby': labelId }}
                     />
+                    <ListItemText primary={ value.name } />
                   </ListItemButton>
                 </ListItem>
               </>
@@ -141,7 +166,7 @@ export default function NewGame() {
       </Grid>
 
       <Grid item xs={12} container justifyContent="center">
-        <Button onClick={ handleClickCreateGame } sx={{ minWidth: '200px' }} variant="contained">Start the Game</Button>
+        <Button onClick={ handleClickCreateGame } sx={{ minWidth: '200px' }} variant="contained" color="success">Start the Game</Button>
       </Grid>
 
       <Grid item xs={12} container justifyContent="center">
@@ -158,9 +183,7 @@ export default function NewGame() {
     >
       <Paper sx={style}>
         <Grid container justifyContent="center" alignItems="center" alignContent="center" spacing={1}>
-          <Typography id="modal-modal-title" variant="h6" component="h2">
-            Add Player
-          </Typography>
+          <Typography id="modal-modal-title" variant="h6" component="h2">Add Player</Typography>
 
           <Grid item xs={12}>
             <TextField value={ player() }
@@ -173,7 +196,11 @@ export default function NewGame() {
 
           <Grid item xs={12} container justifyContent="end">
             <Button onClick={ handleCloseModal } sx={{ minWidth: '100px', marginRight: '1rem' }} >Close</Button>
-            <Button onClick={ handleClickAddPlayer } sx={{ minWidth: '100px' }} variant="contained">Add</Button>
+            <Show when={updateUserId()} fallback={
+              <Button onClick={ handleClickAddPlayer } sx={{ minWidth: '100px' }} variant="contained">Add</Button>
+            }>
+              <Button onClick={ handleClickEditPlayer } sx={{ minWidth: '100px' }} variant="contained">Edit</Button>
+            </Show>
           </Grid>
         </Grid>
       </Paper>

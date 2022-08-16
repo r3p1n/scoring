@@ -1,6 +1,6 @@
 import { lazy } from 'solid-js'
 
-export const prefix = '/scoring'
+export const prefix = import.meta.env.VITE_URL_PREFIX
 
 export const routes = [
   {
