@@ -4,11 +4,14 @@
   "description": "App for calc score",
   "scripts": {
     "dev": "vite --mode dev",
-    "build": "vite build --base=/scoring/ --mode prod",
-    "serve": "vite preview"
+    "build": "vite build --mode prod",
+    "build_with_prefix": "vite build --base=/scoring/ --mode prod",
+    "serve": "vite preview",
+    "deploy": "surge --domain scoring-for-fun.surge.sh"
   },
   "license": "MIT",
   "devDependencies": {
+    "surge": "^0.23.1",
     "vite": "^3.0.0",
     "vite-plugin-solid": "^2.3.0"
   },

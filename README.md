@@ -9,4 +9,4 @@ Using:
 - SUID - https://suid.io/
 - Solid Router - https://github.com/solidjs/solid-router
 - WebSQL
-
+- Surge https://surge.sh/
