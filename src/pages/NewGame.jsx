@@ -78,7 +78,7 @@ export default function NewGame() {
       console.error(e)
       return
     }
-    navigate(`${prefix}/game/${newGameId}/new-round`)
+    navigate(`${prefix}/game/${newGameId}/round`)
   }
 
   const handleClickModalOpen = () => setOpen(true)
@@ -127,9 +127,9 @@ export default function NewGame() {
         <Typography variant="h4" component="h1">New game</Typography>
       </Grid>
 
-      <Grid item xs={12} sx={{}}>
-        <Typography sx={{ maxWidth: '400px', margin: '0 auto' }}>Players</Typography>
-        <Paper sx={{ width: '100%', maxWidth: '400px', maxHeight: '200px', overflow: 'auto', margin: '0 auto' }} variant="outlined">
+      <Grid item xs={12}>
+        <Typography variant="h6">Players</Typography>
+        <Paper sx={{ width: '100%', maxHeight: '200px', overflow: 'auto', margin: '0 auto' }} variant="outlined">
           <List dense sx={{ width: '100%', minHeight: '190px', bgcolor: 'background.paper' }}>
             { players().map((value) => {
               const labelId = `checkbox-list-secondary-label-${value.id}`
@@ -171,7 +171,7 @@ export default function NewGame() {
 
       <Grid item xs={12} container justifyContent="center">
         <Link class="btn-link" href={`${prefix}/`}>
-          <Button sx={{ minWidth: '200px' }} variant="contained">Main Menu</Button>
+          <Button sx={{ minWidth: '200px' }} variant="outlined">Main Menu</Button>
         </Link>
       </Grid>
     </Grid>

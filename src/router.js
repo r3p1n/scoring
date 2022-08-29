@@ -12,8 +12,12 @@ export const routes = [
     component: lazy(() => import('./pages/NewGame'))
   },
   {
-    path: prefix +'/game/:id/new-round',
-    component: lazy(() => import('./pages/NewRound'))
+    path: prefix +'/continue',
+    component: lazy(() => import('./pages/Continue'))
+  },
+  {
+    path: prefix +'/game/:id/round',
+    component: lazy(() => import('./pages/Round'))
   },
   {
     path: prefix +'/game/:id/results',

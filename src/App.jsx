@@ -42,13 +42,13 @@ export default function App() {
 
   const Routes = useRoutes(routes)
   return <>
-    <Show when={isWebSQL} 
+    <Show when={isWebSQL}
       fallback={
         <h1 style={{ color: 'red' }}>This browser does not support WebSQL :'(</h1>
       }
     >
       <CssBaseline />
-      <Container sx={{ height: "100vh" }}>
+      <Container>
         <Routes />
       </Container>
     </Show>

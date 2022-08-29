@@ -16,7 +16,7 @@ import Alert from '@suid/material/Alert'
 import { dbExec } from '../websql'
 import { prefix } from '../router'
 
-export default function NewRound() {
+export default function Round() {
   const params = useParams()
   const navigate = useNavigate()
   const [roundNumber, setRoundNumber] = createSignal(0)
@@ -25,9 +25,25 @@ export default function NewRound() {
   const [scores, setScores] = createStore([])
 
   onMount(async () => {
-    await getRound(params.id)
-    await getScore(params.id)
+    if (await isFinishedGame(params.id)) {
+      navigate(`${prefix}/game/${params.id}/results`)
+    } else {
+      await getRound(params.id)
+      await getScore(params.id)
+    }
   })
+
+  const isFinishedGame = async (gameId) => {
+    try {
+      let result = await dbExec("SELECT finished_at FROM games WHERE id = ?", [gameId])
+      if (result.rows.length && result.rows[0].finished_at) {
+        return true
+      }
+      return false
+    } catch (e) {
+      console.error(e)
+    }
+  }
 
   const getRound = async (gameId) => {
     try {
@@ -45,7 +61,8 @@ export default function NewRound() {
   const getScore = async (gameId) => {
     try {
       let result = await dbExec(`
-        SELECT p.id AS player_id, u.name AS player_name, SUM(IFNULL(s.score, 0)) AS last_round_score, 0 AS score, SUM(IFNULL(s.score, 0)) AS total_score FROM games g
+        SELECT p.id AS player_id, u.name AS player_name, SUM(IFNULL(s.score, 0)) AS last_round_score, 0 AS score,
+          SUM(IFNULL(s.score, 0)) AS total_score, g.finished_at FROM games g
           JOIN users u ON u.id = p.user_id
           JOIN players p ON p.game_id = g.id
           LEFT JOIN rounds r ON r.game_id = g.id
@@ -63,13 +80,10 @@ export default function NewRound() {
     }
   }
 
-  const saveRoundData = async (gameId) => {
-    let notEmpty = scores.find(s => s.score !== 0)
-    if (!notEmpty) {
-      setEmptyScore(true)
-      return false
-    }
+  const isNotEmptyScore = () => scores.find(s => s.score !== 0)
+  const isNotEmptyTotalScore = () => scores.find(s => s.total_score !== 0)
 
+  const saveRoundData = async (gameId) => {
     try {
       let result = await dbExec("INSERT INTO rounds (number, game_id) VALUES (?, ?)", [roundNumber(), gameId])
       let newRoundId = result.insertId
@@ -89,11 +103,22 @@ export default function NewRound() {
     setScores(score => score.player_id === id, 'score', newScore)
     setScores(score => score.player_id === id, 'total_score', lastRoundScore + newScore)
     setEmptyScore(false)
+    if (newScore === 0 && event.target.selectionStart === 0) {
+      const end = event.target.value.length
+      event.target.setSelectionRange(end, end)
+    }
   }
 
   const handlerClickFinishGame = async () => {
-    const success = await saveRoundData(params.id)
-    if (!success) {
+    if (isNotEmptyScore()) {
+      const success = await saveRoundData(params.id)
+      if (!success) {
+        return
+      }
+    }
+
+    if (!isNotEmptyTotalScore()) {
+      setEmptyScore(true)
       return
     }
 
@@ -108,6 +133,10 @@ export default function NewRound() {
   }
 
   const handlerClickNextRound = async () => {
+    if (!isNotEmptyScore()) {
+      setEmptyScore(true)
+      return false
+    }
     const success = await saveRoundData(params.id)
     if (!success) {
       return
@@ -141,6 +170,7 @@ export default function NewRound() {
                       key={ score.player_id }
                       onChange={ handlerChangeScores(score.player_id) }
                       sx={{ maxWidth: '120px' }}
+                      inputProps={{ inputMode: 'numeric' }}
                     />
                   </TableCell>
                   <TableCell align="right">{ score.total_score.toString() }</TableCell>
@@ -175,7 +205,7 @@ export default function NewRound() {
 
       <Grid item xs={12} container justifyContent="center">
         <Link class="btn-link" href={`${prefix}/`}>
-          <Button sx={{ minWidth: '200px', mb: 1 }} variant="contained">Main Menu</Button>
+          <Button sx={{ minWidth: '200px', mb: 1 }} variant="outlined">Main Menu</Button>
         </Link>
       </Grid>
     </Grid>

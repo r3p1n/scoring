@@ -1,10 +1,10 @@
 {
   "name": "scoring",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "App for calc score",
   "scripts": {
     "dev": "vite --mode dev",
-    "build": "vite build --mode prod",
+    "build": "vite build --mode preprod",
     "build_with_prefix": "vite build --base=/scoring/ --mode prod",
     "serve": "vite preview",
     "deploy": "surge --domain scoring-for-fun.surge.sh"
