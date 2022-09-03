@@ -30,6 +30,12 @@ export default function Home() {
           <Button variant="contained" sx={{ minWidth: '200px', mt: 2 }}>Continue</Button>
         </Link>
       </Grid>
+
+      <Grid item xs={12} container justifyContent="center">
+        <Link class="btn-link" href={`${prefix}/history`}>
+          <Button variant="contained" sx={{ minWidth: '200px', mt: 2 }}>History</Button>
+        </Link>
+      </Grid>
     </Grid>
   </>
 }

@@ -16,6 +16,10 @@ export const routes = [
     component: lazy(() => import('./pages/Continue'))
   },
   {
+    path: prefix +'/history',
+    component: lazy(() => import('./pages/History'))
+  },
+  {
     path: prefix +'/game/:id/round',
     component: lazy(() => import('./pages/Round'))
   },

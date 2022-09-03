@@ -16,18 +16,18 @@ import { prefix } from '../router'
 import db from '../mixins/database'
 import { formatDatetime } from '../mixins/global'
 
-export default function Continue() {
+export default function History() {
   const [games, setGames] = createStore([])
-  const [noActiveGame, setNoActiveGame] = createSignal(false)
+  const [noFinishedGame, setNoFinishedGame] = createSignal(false)
 
   onMount(async () => {
-    await getUnfinishedGames()
+    await getFinishedGames()
   })
 
-  const getUnfinishedGames = async () => {
-    const rows = await db.getUnfinishedGames()
+  const getFinishedGames = async () => {
+    const rows = await db.getFinishedGames()
     if (!rows.length) {
-      setNoActiveGame(true)
+      setNoFinishedGame(true)
       return
     }
     setGames([...rows])
@@ -36,7 +36,7 @@ export default function Continue() {
   return <>
     <Grid container alignContent="center" rowSpacing={2} sx={{ mt: 1 }}>
       <Grid item xs={12} container justifyContent="center">
-        <Typography variant="h4" component="h1">Continue</Typography>
+        <Typography variant="h4" component="h1">History</Typography>
       </Grid>
 
       <Grid item xs={12} sx={{ overflow: 'auto' }}>
@@ -58,8 +58,8 @@ export default function Continue() {
                   <TableCell>{ formatDatetime(game.created_at) }</TableCell>
                   <TableCell>{ game.goal }</TableCell>
                   <TableCell align="right">
-                    <Link class="btn-link" href={`${prefix}/game/${game.id}/round`}>
-                      <Button variant="contained">Play</Button>
+                    <Link class="btn-link" href={`${prefix}/game/${game.id}/results`}>
+                      <Button variant="contained">Result</Button>
                     </Link>
                   </TableCell>
                 </TableRow>
@@ -69,9 +69,9 @@ export default function Continue() {
         </Table>
       </Grid>
 
-      <Show when={noActiveGame()}>
+      <Show when={noFinishedGame()}>
         <Grid item xs={12} container justifyContent="center">
-          <Alert severity="error">No active game</Alert>
+          <Alert severity="error">No finished game</Alert>
         </Grid>
       </Show>
 

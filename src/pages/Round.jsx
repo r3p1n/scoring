@@ -13,8 +13,8 @@ import TableCell from '@suid/material/TableCell'
 import TextField from '@suid/material/TextField'
 import Alert from '@suid/material/Alert'
 
-import { dbExec } from '../websql'
 import { prefix } from '../router'
+import db from '../mixins/database'
 
 export default function Round() {
   const params = useParams()
@@ -31,58 +31,33 @@ export default function Round() {
     } else {
       await getRound(params.id)
       await getScore(params.id)
-      const result = await dbExec("SELECT goal FROM games WHERE id = ?", [params.id])
-      if (result.rows.length) {
-        setGoal(result.rows[0].goal)
+      const rows = await db.getGameGoal(params.id)
+      if (rows.length) {
+        setGoal(rows[0].goal)
       }
     }
   })
 
   const isFinishedGame = async (gameId) => {
-    try {
-      let result = await dbExec("SELECT finished_at FROM games WHERE id = ?", [gameId])
-      if (result.rows.length && result.rows[0].finished_at) {
-        return true
-      }
-      return false
-    } catch (e) {
-      console.error(e)
+    const rows = await db.getGameFinishedAt(gameId)
+    if (rows.length && rows[0].finished_at) {
+      return true
     }
+    return false
   }
 
   const getRound = async (gameId) => {
-    try {
-      let result = await dbExec("SELECT r.number, r.id FROM rounds r WHERE r.game_id = ? ORDER BY id DESC LIMIT 1", [gameId])
-      if (result.rows.length) {
-        setRoundNumber(result.rows[0].number + 1)
-      } else {
-        setRoundNumber(1)
-      }
-    } catch (e) {
-      console.error(e)
-    }
+    const lastRound = await db.getLastRound(gameId)
+    setRoundNumber(lastRound + 1)
   }
 
   const getScore = async (gameId) => {
-    try {
-      let result = await dbExec(`
-        SELECT p.id AS player_id, u.name AS player_name, SUM(IFNULL(s.score, 0)) AS last_round_score, 0 AS score,
-          SUM(IFNULL(s.score, 0)) AS total_score, g.finished_at FROM games g
-          JOIN users u ON u.id = p.user_id
-          JOIN players p ON p.game_id = g.id
-          LEFT JOIN rounds r ON r.game_id = g.id
-          LEFT JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
-          WHERE g.id = ?
-          GROUP BY p.id
-      `, [gameId])
-      if (!result.rows.length) {
-        setGameNotFound(true)
-        return
-      }
-      setScores([...result.rows])
-    } catch (e) {
-      console.error(e)
+    const rows = await db.getLastRoundScore(gameId)
+    if (!rows.length) {
+      setGameNotFound(true)
+      return
     }
+    setScores([...rows])
   }
 
   const isNotEmptyScore = () => scores.find(s => s.score !== 0)
@@ -90,16 +65,11 @@ export default function Round() {
   const isGoalAchieved = () => scores.find(s => s.total_score > goal())
 
   const saveRoundData = async (gameId) => {
-    try {
-      let result = await dbExec("INSERT INTO rounds (number, game_id) VALUES (?, ?)", [roundNumber(), gameId])
-      let newRoundId = result.insertId
-      scores.forEach(async score => {
-        await dbExec("INSERT INTO scores (round_id, player_id, score) VALUES (?, ?, ?)", [newRoundId, score.player_id, score.score])
-      })
-    } catch (e) {
-      console.error(e)
+    const newRoundId = await db.addRound(gameId, roundNumber())
+    if (!newRoundId) {
       return false
     }
+    scores.forEach(async score => await db.addScore(newRoundId, score.player_id, score.score))
     return true
   }
   
@@ -129,10 +99,8 @@ export default function Round() {
       return
     }
 
-    try {
-      await dbExec("UPDATE games SET finished_at = datetime('now') WHERE id = ?", [params.id])
-    } catch (e) {
-      console.error(e)
+    const rowsAffected = await db.setGameFinishedAtNow(params.id)
+    if (!rowsAffected) {
       return
     }
 

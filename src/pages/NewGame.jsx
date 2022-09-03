@@ -18,9 +18,8 @@ import FormControlLabel from '@suid/material/FormControlLabel'
 import EditIcon from '@suid/icons-material/Edit'
 import PlaylistAddIcon from '@suid/icons-material/PlaylistAdd'
 
-import { dbExec } from '../websql'
 import { prefix } from '../router'
-import { getSetting } from '../mixins'
+import db from '../mixins/database'
 
 const style = {
   position: 'absolute',
@@ -45,18 +44,14 @@ export default function NewGame() {
   const [goal, setGoal] = createSignal('250')
 
   onMount(async () => {
-    const goal = await getSetting('GOAL')
+    const goal = await db.getSetting('GOAL')
     goal && setGoal(goal)
     await getPlayers()
   })
 
   const getPlayers = async () => {
-    try {
-      let result = await dbExec("SELECT * FROM users")
-      setPlayers([...result.rows])
-    } catch (e) {
-      console.error(e)
-    }
+    let users = await db.getUsers()
+    setPlayers([...users])
   }
 
   const handleToggle = (value) => () => {
@@ -81,27 +76,14 @@ export default function NewGame() {
     let g = null
     if (goalChecked()) {
       g = +goal() > 0 ? +goal() : null
-      try {
-        let result = await dbExec(`UPDATE settings SET value = ? WHERE key = 'GOAL'`, [g.toString()])
-        if (!result.rowsAffected) {
-          await dbExec(`INSERT INTO settings (key, value) VALUES ('GOAL', ?)`, [g.toString()])
-        }
-      } catch (e) {
-        console.error(e)
-      }
+      await db.setSetting('GOAL', g.toString())
     }
 
-    let newGameId
-    try {
-      let result = await dbExec("INSERT INTO games (goal) VALUES (?)", [g])
-      newGameId = result.insertId
-      checked().forEach(async value => {
-        await dbExec("INSERT INTO players (game_id, user_id) VALUES (?, ?)", [newGameId, value])
-      })
-    } catch (e) {
-      console.error(e)
+    const newGameId = await db.addGame(g)
+    if (!newGameId) {
       return
     }
+    checked().forEach(async value => await db.addPlayer(newGameId, value))
 
     navigate(`${prefix}/game/${newGameId}/round`)
   }
@@ -115,12 +97,8 @@ export default function NewGame() {
   }
 
   const handleAddPlayer = async () => {
-    let newPlayerId
-    try {
-      let result = await dbExec("INSERT INTO users (name) VALUES (?)", [player()])
-      newPlayerId = result.insertId
-    } catch (e) {
-      console.error(e)
+    const newPlayerId = await db.addUser(player())
+    if (!newPlayerId) {
       return
     }
     const newPlayer = { id: newPlayerId, name: player() }
@@ -135,10 +113,8 @@ export default function NewGame() {
   }
 
   const handleEditPlayer = async () => {
-    try {
-      await dbExec("UPDATE users SET name = ? WHERE id = ?", [player(), updateUserId()])
-    } catch (e) {
-      console.error(e)
+    const rowsAffected = db.updateUser(updateUserId(), player())
+    if (!rowsAffected) {
       return
     }
     const updatedPlayer = { id: updateUserId(), name: player() }

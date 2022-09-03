@@ -13,9 +13,9 @@ import Button from '@suid/material/Button'
 import Alert from '@suid/material/Alert'
 import PivotTableChartIcon from '@suid/icons-material/PivotTableChart'
 
-import { dbExec } from '../websql'
 import { prefix } from '../router'
-import { getSetting } from '../mixins'
+import db from '../mixins/database'
+import { randomColor } from '../mixins/global'
 
 const StyledTableRow = styled(TableRow)(() => ({
   '&:nth-of-type(odd)': {
@@ -30,118 +30,54 @@ export default function Results() {
   const [view, setView] = createSignal('rounds')
 
   onMount(async () => {
-    const view = await getSetting('RESULT_VIEW')
+    const view = await db.getSetting('RESULT_VIEW')
     view && setView(view)
     await changeFormat()
   })
 
-  const gerRandomColor = () => {
-    const letters = '789ABCDEF'
-    let color = '#'
-    for (var i = 0; i < 6; i++) {
-      color += letters[Math.floor(Math.random() * 9)]
-    }
-    return color
-  }
+  
 
   const setSettingsView = async () => {
-    try {
-      let result = await dbExec(`UPDATE settings SET value = ? WHERE key = 'RESULT_VIEW'`, [view()])
-      if (!result.rowsAffected) {
-        await dbExec(`INSERT INTO settings (key, value) VALUES ('RESULT_VIEW', ?)`, [view()])
-      }
-    } catch (e) {
-      console.error(e)
-    }
+    await db.setSetting('RESULT_VIEW', view())
   }
 
   const getViewByPlayer = async () => {
-    try {
-      let result = await dbExec(`
-        SELECT p.id, u.name, SUM(s.score) total_score, null scores FROM games g
-          JOIN users u ON u.id = p.user_id
-          JOIN players p ON p.game_id = g.id
-          JOIN rounds r ON r.game_id = g.id
-          JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
-          WHERE g.id = ? -- AND NOT g.finished_at IS NULL
-          GROUP BY p.id
-          ORDER BY SUM(s.score) DESC
-      `, [params.id])
-      
-      if (!result.rows.length) {
-        setIsActiveGame(true)
-        return
-      }
-
-      const players = [...result.rows]
-      for (const item of players) {
-        result = await dbExec(`
-          SELECT r.number round_number, s.score FROM games g
-            JOIN players p ON p.game_id = g.id AND p.id = ?
-            JOIN rounds r ON r.game_id = g.id
-            JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
-            WHERE g.id = ?
-            ORDER BY r.number
-        `, [item.id, params.id])
-        item.scores = [...result.rows]
-      }
-      setResults(players)
-    } catch (e) {
-      console.error(e)
+    let rows = await db.getPlayersAndTotalScoreAndScores(params.id)
+    if (!rows.length) {
+      setIsActiveGame(true)
+      return
     }
+    const players = [...rows]
+
+    for (const player of players) {
+      rows = await db.getRoundAndScoreByPlayerId(params.id, player.id)
+      player.scores = [...rows]
+    }
+    setResults(players)
   }
 
   const getViewByRound = async () => {
-    try {
-      let result = await dbExec(`
-        SELECT r.id, r.number, null scores FROM games g
-          JOIN rounds r ON r.game_id = g.id
-          WHERE g.id = ?
-          ORDER BY r.number
-      `, [params.id])
-
-      if (!result.rows.length) {
-        setIsActiveGame(true)
-        return
-      }
-
-      const rounds = [...result.rows]
-
-      result = await dbExec(`
-        SELECT p.id, u.name, SUM(s.score) total_score FROM games g
-          JOIN users u ON u.id = p.user_id
-          JOIN players p ON p.game_id = g.id
-          JOIN rounds r ON r.game_id = g.id
-          JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
-          WHERE g.id = ?
-          GROUP BY p.id
-          ORDER BY SUM(s.score) DESC
-      `, [params.id])
-
-      const players = [...result.rows]
-
-      for (const round of rounds) {
-        for (const player of players) {
-          result = await dbExec(`
-            SELECT p.id, s.score FROM games g
-              JOIN players p ON p.game_id = g.id AND p.id = ?
-              JOIN rounds r ON r.game_id = g.id AND r.id = ?
-              JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
-              WHERE g.id = ?
-          `, [player.id, round.id, params.id])
-          round.scores = round.scores === null ? [...result.rows] : [...round.scores, ...result.rows]
-        }
-      }
-
-      let colors = []
-      for (const player of players) {
-        colors = [...colors, gerRandomColor()]
-      }
-      
-      setResults({players, rounds, colors})
-    } catch (e) {
-      console.error(e)
+    let rows = await db.getRoundByNumber(params.id)
+    if (!rows.length) {
+      setIsActiveGame(true)
+      return
     }
+    const rounds = [...rows]
+
+    rows = await db.getPlayersAndTotalScore(params.id)
+    const players = [...rows]
+
+    for (const round of rounds) {
+      for (const player of players) {
+        rows = await db.getScoreByPlayerIdAndRoundId(params.id, player.id, round.id)
+        round.scores = round.scores === null ? [...rows] : [...round.scores, ...rows]
+      }
+    }
+
+    let colors = []
+    players.forEach(() => colors = [...colors, randomColor()])
+    
+    setResults({players, rounds, colors})
   }
 
   const changeFormat = async () => {
