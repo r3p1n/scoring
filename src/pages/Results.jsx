@@ -11,11 +11,11 @@ import TableRow from '@suid/material/TableRow'
 import TableCell from '@suid/material/TableCell'
 import Button from '@suid/material/Button'
 import Alert from '@suid/material/Alert'
-import IconButton from '@suid/material/IconButton'
 import PivotTableChartIcon from '@suid/icons-material/PivotTableChart'
 
 import { dbExec } from '../websql'
 import { prefix } from '../router'
+import { getSetting } from '../mixins'
 
 const StyledTableRow = styled(TableRow)(() => ({
   '&:nth-of-type(odd)': {
@@ -27,10 +27,12 @@ export default function Results() {
   const params = useParams()
   const [results, setResults] = createSignal([])
   const [isActiveGame, setIsActiveGame] = createSignal(false)
-  const [isRowByPlayer, setIsRowByPlayer] = createSignal(true)
+  const [view, setView] = createSignal('rounds')
 
   onMount(async () => {
-    getRowByPlayer()
+    const view = await getSetting('RESULT_VIEW')
+    view && setView(view)
+    await changeFormat()
   })
 
   const gerRandomColor = () => {
@@ -42,7 +44,18 @@ export default function Results() {
     return color
   }
 
-  const getRowByPlayer = async () => {
+  const setSettingsView = async () => {
+    try {
+      let result = await dbExec(`UPDATE settings SET value = ? WHERE key = 'RESULT_VIEW'`, [view()])
+      if (!result.rowsAffected) {
+        await dbExec(`INSERT INTO settings (key, value) VALUES ('RESULT_VIEW', ?)`, [view()])
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const getViewByPlayer = async () => {
     try {
       let result = await dbExec(`
         SELECT p.id, u.name, SUM(s.score) total_score, null scores FROM games g
@@ -78,7 +91,7 @@ export default function Results() {
     }
   }
 
-  const getRowByRound = async () => {
+  const getViewByRound = async () => {
     try {
       let result = await dbExec(`
         SELECT r.id, r.number, null scores FROM games g
@@ -131,10 +144,14 @@ export default function Results() {
     }
   }
 
-  const handlerClickChangeFormat = async () => {
-    setIsRowByPlayer(!isRowByPlayer())
+  const changeFormat = async () => {
+    view() === 'players' ? await getViewByPlayer() : await getViewByRound()
+  }
 
-    isRowByPlayer() ? await getRowByPlayer() : await getRowByRound()
+  const handlerClickChangeFormat = () => {
+    setView(view() === 'players' ? 'rounds' : 'players')
+    changeFormat()
+    setSettingsView()
   }
 
   return <>
@@ -144,14 +161,12 @@ export default function Results() {
       </Grid>
 
       <Grid item xs={12} container justifyContent="end">
-        <IconButton onClick={ handlerClickChangeFormat } color="primary">
-          <PivotTableChartIcon />
-        </IconButton>
+        <Button onClick={ handlerClickChangeFormat } variant="contained" startIcon={<PivotTableChartIcon />}>Change view</Button>
       </Grid> 
 
       <Grid item xs={12} sx={{ overflow: 'auto' }}>
         <Switch>
-          <Match when={isRowByPlayer()}>
+          <Match when={view() === 'players'}>
             <Table>
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#ddd' }}>
@@ -183,7 +198,7 @@ export default function Results() {
               </TableBody>
             </Table>
           </Match>
-          <Match when={!isRowByPlayer()}>
+          <Match when={view() === 'rounds'}>
             <Table>
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#ddd' }}>
@@ -238,7 +253,7 @@ export default function Results() {
 
       <Grid item xs={12} container justifyContent="center">
         <Link class="btn-link" href={`${prefix}/`}>
-          <Button sx={{ minWidth: '200px', mb: 1 }} variant="contained">Main Menu</Button>
+          <Button sx={{ minWidth: '200px', mb: 1 }} variant="outlined">Main Menu</Button>
         </Link>
       </Grid>
     </Grid>

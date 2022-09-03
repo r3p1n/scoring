@@ -6,6 +6,7 @@ import CssBaseline from '@suid/material/CssBaseline'
 
 import { routes } from './router'
 import { isWebSQL, dbExec } from './websql'
+import { getSetting } from './mixins'
 
 export default function App() {
   onMount(async () => {
@@ -17,7 +18,8 @@ export default function App() {
       await dbExec(`CREATE TABLE IF NOT EXISTS games (
         id INTEGER PRIMARY KEY,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        finished_at TIMESTAMP DEFAULT NULL
+        finished_at TIMESTAMP DEFAULT NULL,
+        goal INTEGER
       )`)
       await dbExec(`CREATE TABLE IF NOT EXISTS players (
         id INTEGER PRIMARY KEY,
@@ -35,8 +37,23 @@ export default function App() {
         player_id INTEGER,
         score INTEGER
       )`)
+      await dbExec(`CREATE TABLE IF NOT EXISTS settings (
+        id INTEGER PRIMARY KEY,
+        key TEXT,
+        value TEXT
+      )`)
     } catch (e) {
       console.error(e)
+    }
+
+    const version = await getSetting('VERSION')
+    if (!version) {
+      try {
+        await dbExec(`ALTER TABLE games ADD goal INTEGER`)
+      } catch (e) {
+        console.error(e)
+      }
+      await dbExec(`INSERT INTO settings (key, value) VALUES ('VERSION', '220903')`)
     }
   })
 

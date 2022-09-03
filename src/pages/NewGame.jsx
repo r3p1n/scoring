@@ -14,10 +14,13 @@ import Typography from '@suid/material/Typography'
 import TextField from '@suid/material/TextField'
 import Alert from '@suid/material/Alert'
 import IconButton from '@suid/material/IconButton'
+import FormControlLabel from '@suid/material/FormControlLabel'
 import EditIcon from '@suid/icons-material/Edit'
+import PlaylistAddIcon from '@suid/icons-material/PlaylistAdd'
 
 import { dbExec } from '../websql'
 import { prefix } from '../router'
+import { getSetting } from '../mixins'
 
 const style = {
   position: 'absolute',
@@ -38,17 +41,25 @@ export default function NewGame() {
   const [exception, setException] = createSignal(false)
   const [open, setOpen] = createSignal(false)
   const [updateUserId, setUpdateUserId] = createSignal(null)
+  const [goalChecked, setGoalChecked] = createSignal(false)
+  const [goal, setGoal] = createSignal('250')
 
   onMount(async () => {
+    const goal = await getSetting('GOAL')
+    goal && setGoal(goal)
+    await getPlayers()
+  })
+
+  const getPlayers = async () => {
     try {
       let result = await dbExec("SELECT * FROM users")
       setPlayers([...result.rows])
     } catch (e) {
       console.error(e)
     }
-  })
+  }
 
-  const handleClickToggle = (value) => () => {
+  const handleToggle = (value) => () => {
     const currentIndex = checked().indexOf(value)
     const newChecked = [...checked()]
 
@@ -61,15 +72,28 @@ export default function NewGame() {
     setChecked(newChecked)
   }
 
-  const handleClickCreateGame = async () => {
+  const handleCreateGame = async () => {
     if (checked().length < 2) {
       setException(true)
       return
     }
 
+    let g = null
+    if (goalChecked()) {
+      g = +goal() > 0 ? +goal() : null
+      try {
+        let result = await dbExec(`UPDATE settings SET value = ? WHERE key = 'GOAL'`, [g.toString()])
+        if (!result.rowsAffected) {
+          await dbExec(`INSERT INTO settings (key, value) VALUES ('GOAL', ?)`, [g.toString()])
+        }
+      } catch (e) {
+        console.error(e)
+      }
+    }
+
     let newGameId
     try {
-      let result = await dbExec("INSERT INTO games default VALUES")
+      let result = await dbExec("INSERT INTO games (goal) VALUES (?)", [g])
       newGameId = result.insertId
       checked().forEach(async value => {
         await dbExec("INSERT INTO players (game_id, user_id) VALUES (?, ?)", [newGameId, value])
@@ -78,10 +102,11 @@ export default function NewGame() {
       console.error(e)
       return
     }
+
     navigate(`${prefix}/game/${newGameId}/round`)
   }
 
-  const handleClickModalOpen = () => setOpen(true)
+  const handleModalOpen = () => setOpen(true)
   
   const handleCloseModal = () => {
     setOpen(false)
@@ -89,7 +114,7 @@ export default function NewGame() {
     setUpdateUserId(null)
   }
 
-  const handleClickAddPlayer = async () => {
+  const handleAddPlayer = async () => {
     let newPlayerId
     try {
       let result = await dbExec("INSERT INTO users (name) VALUES (?)", [player()])
@@ -103,13 +128,13 @@ export default function NewGame() {
     handleCloseModal()
   }
 
-  const handleClickModalEdit = (user) => () => {
+  const handleModalEdit = (user) => () => {
     setPlayer(user.name)
     setUpdateUserId(user.id)
     setOpen(true)
   }
 
-  const handleClickEditPlayer = async () => {
+  const handleEditPlayer = async () => {
     try {
       await dbExec("UPDATE users SET name = ? WHERE id = ?", [player(), updateUserId()])
     } catch (e) {
@@ -121,10 +146,23 @@ export default function NewGame() {
     handleCloseModal()
   }
 
+  const handleGoalChecked = (event) => {
+    setGoalChecked(!event.target.checked)
+  }
+
+  const handleGoal = (event) => {
+    const goal = event.target.value.replace(/[^0-9]/g, '')
+    setGoal(goal)
+  }
+
   return <>
     <Grid container alignContent="center" rowSpacing={2} sx={{ mt: 1 }}>
       <Grid item xs={12} container justifyContent="center">
         <Typography variant="h4" component="h1">New game</Typography>
+      </Grid>
+
+      <Grid item xs={12} container justifyContent="end">
+        <Button onClick={ handleModalOpen } variant="contained" startIcon={<PlaylistAddIcon />}>Add Player</Button>
       </Grid>
 
       <Grid item xs={12}>
@@ -136,12 +174,12 @@ export default function NewGame() {
               return <>
                 <ListItem sx={{ height: '50px'}} disablePadding
                   secondaryAction={
-                    <IconButton onClick={ handleClickModalEdit(value) } edge="end" color="primary">
+                    <IconButton onClick={ handleModalEdit(value) } edge="end" color="primary">
                       <EditIcon />
                     </IconButton>
                   }
                 >
-                  <ListItemButton onClick={ handleClickToggle(value.id) }>
+                  <ListItemButton onClick={ handleToggle(value.id) }>
                     <Checkbox edge="start"
                       checked={ checked().indexOf(value.id) !== -1 }
                       inputProps={{ 'aria-labelledby': labelId }}
@@ -162,11 +200,20 @@ export default function NewGame() {
       </Show>
 
       <Grid item xs={12} container justifyContent="center">
-        <Button onClick={ handleClickModalOpen } sx={{ minWidth: '200px' }} variant="contained">Add Player</Button>
+        <FormControlLabel label="Set goal" control={
+          <Checkbox checked={ goalChecked() } onChange={ handleGoalChecked } sx={{ '& .MuiSvgIcon-root': { fontSize: 30 } }} />
+        } />
+        <Show when={ goalChecked() }>
+          <TextField value={ goal() }
+            onChange={ handleGoal }
+            sx={{ maxWidth: '120px' }}
+            inputProps={{ inputMode: 'numeric' }}
+          />
+        </Show>
       </Grid>
 
       <Grid item xs={12} container justifyContent="center">
-        <Button onClick={ handleClickCreateGame } sx={{ minWidth: '200px' }} variant="contained" color="success">Start the Game</Button>
+        <Button onClick={ handleCreateGame } sx={{ minWidth: '200px' }} variant="contained" color="success">Start the Game</Button>
       </Grid>
 
       <Grid item xs={12} container justifyContent="center">
@@ -197,9 +244,9 @@ export default function NewGame() {
           <Grid item xs={12} container justifyContent="end">
             <Button onClick={ handleCloseModal } sx={{ minWidth: '100px', marginRight: '1rem' }} >Close</Button>
             <Show when={updateUserId()} fallback={
-              <Button onClick={ handleClickAddPlayer } sx={{ minWidth: '100px' }} variant="contained">Add</Button>
+              <Button onClick={ handleAddPlayer } sx={{ minWidth: '100px' }} variant="contained">Add</Button>
             }>
-              <Button onClick={ handleClickEditPlayer } sx={{ minWidth: '100px' }} variant="contained">Edit</Button>
+              <Button onClick={ handleEditPlayer } sx={{ minWidth: '100px' }} variant="contained">Edit</Button>
             </Show>
           </Grid>
         </Grid>

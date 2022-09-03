@@ -15,7 +15,7 @@ export default function Home() {
 
       <Grid item xs={12} container justifyContent="center">
         <span style={{color: 'rgba(0,0,0,0.25)', 'font-size': '0.75rem'}}>
-          { import.meta.env.VITE_VERSION }
+          v. { __APP_VERSION__ }
         </span>
       </Grid>
 

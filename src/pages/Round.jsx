@@ -23,6 +23,7 @@ export default function Round() {
   const [gameNotFound, setGameNotFound] = createSignal(false)
   const [emptyScore, setEmptyScore] = createSignal(false)
   const [scores, setScores] = createStore([])
+  const [goal, setGoal] = createSignal(0)
 
   onMount(async () => {
     if (await isFinishedGame(params.id)) {
@@ -30,6 +31,10 @@ export default function Round() {
     } else {
       await getRound(params.id)
       await getScore(params.id)
+      const result = await dbExec("SELECT goal FROM games WHERE id = ?", [params.id])
+      if (result.rows.length) {
+        setGoal(result.rows[0].goal)
+      }
     }
   })
 
@@ -82,6 +87,7 @@ export default function Round() {
 
   const isNotEmptyScore = () => scores.find(s => s.score !== 0)
   const isNotEmptyTotalScore = () => scores.find(s => s.total_score !== 0)
+  const isGoalAchieved = () => scores.find(s => s.total_score > goal())
 
   const saveRoundData = async (gameId) => {
     try {
@@ -105,6 +111,7 @@ export default function Round() {
     setEmptyScore(false)
     if (newScore === 0 && event.target.selectionStart === 0) {
       const end = event.target.value.length
+      event.target.focus()
       event.target.setSelectionRange(end, end)
     }
   }
@@ -135,8 +142,14 @@ export default function Round() {
   const handlerClickNextRound = async () => {
     if (!isNotEmptyScore()) {
       setEmptyScore(true)
-      return false
+      return
     }
+
+    if (goal() > 0 && isGoalAchieved()) {
+      await handlerClickFinishGame()
+      return
+    }
+
     const success = await saveRoundData(params.id)
     if (!success) {
       return
