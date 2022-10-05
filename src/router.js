@@ -28,6 +28,10 @@ export const routes = [
     component: lazy(() => import('./pages/Results'))
   },
   {
+    path: prefix +'/game/:id/stats',
+    component: lazy(() => import('./pages/Results'))
+  },
+  {
     path: prefix +'/game/:id/settings',
     component: lazy(() => import('./pages/Game'))
   },

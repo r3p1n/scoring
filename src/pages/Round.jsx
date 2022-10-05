@@ -13,6 +13,7 @@ import TableCell from '@suid/material/TableCell'
 import TextField from '@suid/material/TextField'
 import Alert from '@suid/material/Alert'
 import SettingsIcon from '@suid/icons-material/Settings'
+import QueryStatsIcon from '@suid/icons-material/QueryStats';
 
 import { prefix } from '../router'
 import db from '../mixins/database'
@@ -32,10 +33,7 @@ export default function Round() {
     } else {
       await getRound(params.id)
       await getScore(params.id)
-      const rows = await db.getGameGoal(params.id)
-      if (rows.length) {
-        setGoal(rows[0].goal)
-      }
+      setGoal(await db.getGameGoal(params.id))
     }
   })
 
@@ -127,6 +125,10 @@ export default function Round() {
     await getScore(params.id)
   }
 
+  const handlerStats = () => {
+    navigate(`${prefix}/game/${params.id}/stats`)
+  }
+
   const handlerSettings = () => {
     navigate(`${prefix}/game/${params.id}/settings`)
   }
@@ -138,6 +140,7 @@ export default function Round() {
       </Grid>
 
       <Grid item xs={12} container justifyContent="end">
+        <Button onClick={ handlerStats } variant="contained" startIcon={<QueryStatsIcon />} sx={{ mr: 1 }}>Stats</Button>
         <Button onClick={ handlerSettings } variant="contained" startIcon={<SettingsIcon />}>Settings</Button>
       </Grid>
 
@@ -170,6 +173,12 @@ export default function Round() {
           </TableBody>
         </Table>
       </Grid>
+
+      <Show when={goal() > 0}>
+        <Grid item xs={12} container justifyContent="end">
+          <Typography variant="subtitle2">Goal: { goal() }</Typography>
+        </Grid>
+      </Show>
 
       <Show when={emptyScore()}>
         <Grid item xs={12} container justifyContent="center">

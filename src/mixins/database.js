@@ -116,10 +116,20 @@ const addGame = async (goal) => {
 const getGameGoal = async (id) => {
   try {
     const result = await dbExec("SELECT goal FROM games WHERE id = ?", [id])
-    return result.rows
+    return result.rows.length ? result.rows[0].goal : 0 // result.rows
   } catch (e) {
     console.error(e)
-    return []
+    return 0
+  }
+}
+
+const updateGameGoal = async (id, goal) => {
+  try {
+    const result = await dbExec("UPDATE games SET goal = ? WHERE id = ?", [goal, id])
+    return result.rowsAffected
+  } catch (e) {
+    console.error(e)
+    return null
   }
 }
 
@@ -374,6 +384,7 @@ export default {
   
   addGame,
   getGameGoal,
+  updateGameGoal,
   getGameFinishedAt,
   setGameFinishedAtNow,
   getUnfinishedGames,

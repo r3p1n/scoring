@@ -1,4 +1,4 @@
-import { onMount, createSignal, createMemo, Show, Switch, Match } from 'solid-js'
+import { onMount, createSignal, Show, Switch, Match } from 'solid-js'
 import { Link, useNavigate, useLocation, useParams } from '@solidjs/router'
 
 import Grid from '@suid/material/Grid'
@@ -53,7 +53,8 @@ export default function NewGame() {
 
     if (location.pathname.indexOf('settings') > 0) {
       setIsNewGame(false)
-      checkSettingPlayers()
+      await setSettingGoal()
+      await setSettingPlayers()
     }
   })
 
@@ -68,15 +69,22 @@ export default function NewGame() {
   }
 
   const initGoal = async () => {
-    let g = null
-    if (goalChecked()) {
-      g = +goal() > 0 ? +goal() : null
-      await db.setSetting('GOAL', g.toString())
-    }
+    if (!goalChecked()) return 0
+
+    let g = +goal()
+    await db.setSetting('GOAL', g.toString())
     return g
   }
 
-  const checkSettingPlayers = async () => {
+  const setSettingGoal = async () => {
+    const g = await db.getGameGoal(params.id)
+    setGoalChecked(g > 0)
+    if (goalChecked()) {
+      setGoal(g.toString())
+    }
+  }
+
+  const setSettingPlayers = async () => {
     const participants = await db.getPlayers(params.id)
     let newChecked = players().map(v => {
       if (participants.find(p => p.is_active && p.user_id === v.id))
@@ -118,7 +126,9 @@ export default function NewGame() {
       return
     }
 
-    await initGoal()
+    let g = await initGoal()
+    await db.updateGameGoal(params.id, g)
+
     const participants = await db.getPlayers(params.id)
     for (let p of players()) {
       let selected = checked().find(v => v === p.id)
@@ -134,7 +144,7 @@ export default function NewGame() {
         await db.updateActivityPlayer(participant.id, +false)
       }
     }
-    // update goal
+
     navigate(`${prefix}/game/${params.id}/round`)
   }
 
@@ -241,10 +251,10 @@ export default function NewGame() {
       <Grid item xs={12} container justifyContent="center">
         <Switch>
           <Match when={isNewGame()}>
-            <Button onClick={ handleCreateGame } sx={{ minWidth: '200px' }} variant="contained" color="success">Start the Game</Button>
+            <Button onClick={ handleCreateGame } sx={{ minWidth: '200px', mb: 1 }} variant="contained" color="success">Start the Game</Button>
           </Match>
           <Match when={!isNewGame()}>
-            <Button onClick={ handleApplySettings } sx={{ minWidth: '200px' }} variant="contained" color="success">Apply</Button>
+            <Button onClick={ handleApplySettings } sx={{ minWidth: '200px', mb: 1 }} variant="contained" color="success">Apply</Button>
           </Match>
         </Switch>
       </Grid>
@@ -253,16 +263,15 @@ export default function NewGame() {
         <Switch>
           <Match when={isNewGame()}>
             <Link class="btn-link" href={`${prefix}/`}>
-              <Button sx={{ minWidth: '200px' }} variant="outlined">Main Menu</Button>
+              <Button sx={{ minWidth: '200px', mb: 1 }} variant="outlined">Main Menu</Button>
             </Link>
           </Match>
           <Match when={!isNewGame()}>
             <Link class="btn-link" href={`${prefix}/game/${params.id}/round`}>
-              <Button sx={{ minWidth: '200px' }} variant="outlined">Back</Button>
+              <Button sx={{ minWidth: '200px', mb: 1 }} variant="outlined">Back</Button>
             </Link>
           </Match>
         </Switch>
-        
       </Grid>
     </Grid>
 

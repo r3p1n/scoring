@@ -1,5 +1,5 @@
 import { createSignal, onMount, Show, For, Switch, Match } from 'solid-js'
-import { useParams, Link } from '@solidjs/router'
+import { useParams, Link, useLocation } from '@solidjs/router'
 
 import styled from '@suid/system/styled'
 import Grid from '@suid/material/Grid'
@@ -25,17 +25,23 @@ const StyledTableRow = styled(TableRow)(() => ({
 
 export default function Results() {
   const params = useParams()
+  const location = useLocation()
   const [results, setResults] = createSignal([])
   const [isActiveGame, setIsActiveGame] = createSignal(false)
   const [view, setView] = createSignal('rounds')
+  const [isStats, setIsStats] = createSignal(false)
 
   onMount(async () => {
     const view = await db.getSetting('RESULT_VIEW')
     view && setView(view)
     await changeFormat()
+
+    if (location.pathname.indexOf('stats') > 0) {
+      setIsStats(true)
+    }
   })
 
-  
+  const showHeadline = () => isStats() ? 'Stats' : 'Results'
 
   const setSettingsView = async () => {
     await db.setSetting('RESULT_VIEW', view())
@@ -90,7 +96,7 @@ export default function Results() {
   return <>
     <Grid container alignContent="center" rowSpacing={2} sx={{ mt: 1 }}>
       <Grid item xs={12} container justifyContent="center">
-        <Typography id="modal-modal-title" variant="h4" component="h1">Game results</Typography>
+        <Typography id="modal-modal-title" variant="h4" component="h1">{ showHeadline() }</Typography>
       </Grid>
 
       <Grid item xs={12} container justifyContent="end">
@@ -185,9 +191,18 @@ export default function Results() {
       </Show>
 
       <Grid item xs={12} container justifyContent="center">
-        <Link class="btn-link" href={`${prefix}/`}>
-          <Button sx={{ minWidth: '200px', mb: 1 }} variant="outlined">Main Menu</Button>
-        </Link>
+        <Switch>
+          <Match when={!isStats()}>
+            <Link class="btn-link" href={`${prefix}/`}>
+              <Button sx={{ minWidth: '200px', mb: 1 }} variant="outlined">Main Menu</Button>
+            </Link>
+          </Match>
+          <Match when={isStats()}>
+            <Link class="btn-link" href={`${prefix}/game/${params.id}/round`}>
+              <Button sx={{ minWidth: '200px', mb: 1 }} variant="outlined">Back</Button>
+            </Link>
+          </Match>
+        </Switch>
       </Grid>
     </Grid>
   </>
