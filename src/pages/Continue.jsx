@@ -44,7 +44,7 @@ export default function Continue() {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Number</TableCell>
+              <TableCell>#</TableCell>
               <TableCell>Started at</TableCell>
               <TableCell>Goal</TableCell>
               <TableCell></TableCell>

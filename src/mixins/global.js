@@ -1,5 +1,5 @@
 export const formatDatetime = (datetime) => {
-  let dt = new Date(datetime);
+  let dt = new Date(datetime)
   return (
     ("0" + dt.getDate()).slice(-2) + "." +
     ("0" + (dt.getMonth()+1)).slice(-2) + "." +

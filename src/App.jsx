@@ -10,12 +10,16 @@ import db from './mixins/database'
 
 export default function App() {
   onMount(async () => {
+    const tables = await db.getTables()
     await db.createTables()
+    if (!tables.length) {
+      await db.setSetting('VERSION', db.version)
+    }
 
     const version = await db.getSetting('VERSION')
-    if (!version) {
-      await db.updateTables()
-      await db.setSetting('VERSION', '220903')
+    if (!version || version !== db.version) {
+      await db.updateTables(version)
+      await db.setSetting('VERSION', db.version)
     }
   })
 

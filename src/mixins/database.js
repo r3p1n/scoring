@@ -1,6 +1,19 @@
 import { dbExec } from '../websql'
 
+const version = import.meta.env.VITE_DATABASE_VERSION
+
 // tables
+const getTables = async () => {
+  try {
+    const result = await dbExec(`SELECT rootpage, name FROM sqlite_master WHERE type='table' 
+      AND (name='users' OR name='games' OR name='players' OR name='rounds' OR name='scores' OR name='settings')`)
+    return [...result.rows]
+  } catch (e) {
+    console.error(e)
+    return []
+  }
+}
+
 const createTables = async () => {
   try {
     await dbExec(`CREATE TABLE IF NOT EXISTS users (
@@ -18,7 +31,8 @@ const createTables = async () => {
     await dbExec(`CREATE TABLE IF NOT EXISTS players (
       id INTEGER PRIMARY KEY,
       game_id INTEGER,
-      user_id INTEGER
+      user_id INTEGER,
+      is_active TINYINT(1) DEFAULT 1
     )`)
 
     await dbExec(`CREATE TABLE IF NOT EXISTS rounds (
@@ -44,11 +58,22 @@ const createTables = async () => {
   }
 }
 
-const updateTables = async () => {
-  try {
-    await dbExec(`ALTER TABLE games ADD goal INTEGER`)
-  } catch (e) {
-    console.error(e)
+const updateTables = async (currentVersion) => {
+  const v = (currentVersion || '0').replace(/[^0-9]/g, '')
+  if (v < 220903) {
+    try {
+      await dbExec(`ALTER TABLE games ADD goal INTEGER`)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  if (v < 221005) {
+    try {
+      await dbExec(`ALTER TABLE players ADD is_active TINYINT(1) DEFAULT 1`)
+    } catch (e) {
+      console.error(e)
+    }
   }
 }
 
@@ -120,7 +145,7 @@ const setGameFinishedAtNow = async (id) => {
 
 const getUnfinishedGames = async () => {
   try {
-    const result = await dbExec("SELECT * FROM games WHERE finished_at is NULL")
+    const result = await dbExec("SELECT * FROM games WHERE finished_at is NULL ORDER BY created_at DESC")
     return result.rows
   } catch (e) {
     console.error(e)
@@ -130,7 +155,7 @@ const getUnfinishedGames = async () => {
 
 const getFinishedGames = async () => {
   try {
-    const result = await dbExec("SELECT * FROM games WHERE finished_at is not NULL")
+    const result = await dbExec("SELECT * FROM games WHERE finished_at is not NULL ORDER BY finished_at DESC")
     return result.rows
   } catch (e) {
     console.error(e)
@@ -139,6 +164,16 @@ const getFinishedGames = async () => {
 }
 
 // players
+const getPlayers = async (gameId) => {
+  try {
+    const result = await dbExec("SELECT * FROM players WHERE game_id = ?", [gameId])
+    return [...result.rows]
+  } catch (e) {
+    console.error(e)
+    return []
+  }
+}
+
 const addPlayer = async (gameId, userId) => {
   try {
     await dbExec("INSERT INTO players (game_id, user_id) VALUES (?, ?)", [gameId, userId])
@@ -147,11 +182,21 @@ const addPlayer = async (gameId, userId) => {
   }
 }
 
+const updateActivityPlayer = async (id, isActive) => {
+  try {
+    let result = await dbExec("UPDATE players SET is_active = ? WHERE id = ?", [isActive, id])
+    return result.rowsAffected
+  } catch (e) {
+    console.error(e)
+    return null
+  }
+}
+
 // users
 const getUsers = async () => {
   try {
     const result = await dbExec("SELECT * FROM users")
-    return result.rows
+    return [...result.rows]
   } catch (e) {
     console.error(e)
     return []
@@ -214,7 +259,7 @@ const getLastRoundScore = async (gameId) => {
       SELECT p.id AS player_id, u.name AS player_name, SUM(IFNULL(s.score, 0)) AS last_round_score, 0 AS score,
         SUM(IFNULL(s.score, 0)) AS total_score, g.finished_at FROM games g
         JOIN users u ON u.id = p.user_id
-        JOIN players p ON p.game_id = g.id
+        JOIN players p ON p.game_id = g.id AND p.is_active = 1
         LEFT JOIN rounds r ON r.game_id = g.id
         LEFT JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
         WHERE g.id = ?
@@ -234,16 +279,16 @@ const getLastRoundScore = async (gameId) => {
 const getPlayersAndTotalScoreAndScores = async (gameId) => {
   try {
     const result = await dbExec(`
-      SELECT p.id, u.name, SUM(s.score) total_score, null scores FROM games g
+      SELECT p.id, u.name, IFNULL(SUM(s.score), 0) total_score, null scores FROM games g
         JOIN users u ON u.id = p.user_id
-        JOIN players p ON p.game_id = g.id
+        JOIN players p ON p.game_id = g.id AND p.is_active = 1
         JOIN rounds r ON r.game_id = g.id
-        JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
+        LEFT JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
         WHERE g.id = ? -- AND NOT g.finished_at IS NULL
         GROUP BY p.id
         ORDER BY SUM(s.score) DESC
     `, [gameId])
-    return result.rows
+    return [...result.rows]
   } catch (e) {
     console.error(e)
     return []
@@ -253,14 +298,14 @@ const getPlayersAndTotalScoreAndScores = async (gameId) => {
 const getRoundAndScoreByPlayerId = async (gameId, playerId) => {
   try {
     const result = await dbExec(`
-      SELECT r.number round_number, s.score FROM games g
+      SELECT r.number round_number, IFNULL(s.score, 0) score FROM games g
         JOIN players p ON p.game_id = g.id AND p.id = ?
         JOIN rounds r ON r.game_id = g.id
-        JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
+        LEFT JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
         WHERE g.id = ?
         ORDER BY r.number
     `, [playerId, gameId])
-    return result.rows
+    return [...result.rows]
   } catch (e) {
     console.error(e)
     return []
@@ -275,7 +320,7 @@ const getRoundByNumber = async (gameId) => {
         WHERE g.id = ?
         ORDER BY r.number
     `, [gameId])
-    return result.rows
+    return [...result.rows]
   } catch (e) {
     console.error(e)
     return []
@@ -285,16 +330,16 @@ const getRoundByNumber = async (gameId) => {
 const getPlayersAndTotalScore = async (gameId) => {
   try {
     const result = await dbExec(`
-      SELECT p.id, u.name, SUM(s.score) total_score FROM games g
+      SELECT p.id, u.name, IFNULL(SUM(s.score), 0) total_score FROM games g
         JOIN users u ON u.id = p.user_id
-        JOIN players p ON p.game_id = g.id
+        JOIN players p ON p.game_id = g.id AND p.is_active = 1
         JOIN rounds r ON r.game_id = g.id
-        JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
+        LEFT JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
         WHERE g.id = ?
         GROUP BY p.id
         ORDER BY SUM(s.score) DESC
     `, [gameId])
-    return result.rows
+    return [...result.rows]
   } catch (e) {
     console.error(e)
     return []
@@ -304,13 +349,13 @@ const getPlayersAndTotalScore = async (gameId) => {
 const getScoreByPlayerIdAndRoundId = async (gameId, playerId, roundId) => {
   try {
     const result = await dbExec(`
-      SELECT p.id, s.score FROM games g
+      SELECT p.id, IFNULL(s.score, 0) score FROM games g
         JOIN players p ON p.game_id = g.id AND p.id = ?
         JOIN rounds r ON r.game_id = g.id AND r.id = ?
-        JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
+        LEFT JOIN scores s ON s.round_id = r.id AND s.player_id = p.id
         WHERE g.id = ?
     `, [playerId, roundId, gameId])
-    return result.rows
+    return [...result.rows]
   } catch (e) {
     console.error(e)
     return []
@@ -318,6 +363,9 @@ const getScoreByPlayerIdAndRoundId = async (gameId, playerId, roundId) => {
 }
 
 export default {
+  version,
+
+  getTables,
   createTables,
   updateTables,
 
@@ -331,7 +379,9 @@ export default {
   getUnfinishedGames,
   getFinishedGames,
 
+  getPlayers,
   addPlayer,
+  updateActivityPlayer,
 
   getUsers,
   addUser,

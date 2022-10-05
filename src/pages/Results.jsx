@@ -47,11 +47,11 @@ export default function Results() {
       setIsActiveGame(true)
       return
     }
-    const players = [...rows]
+    const players = rows
 
     for (const player of players) {
       rows = await db.getRoundAndScoreByPlayerId(params.id, player.id)
-      player.scores = [...rows]
+      player.scores = rows
     }
     setResults(players)
   }
@@ -62,21 +62,18 @@ export default function Results() {
       setIsActiveGame(true)
       return
     }
-    const rounds = [...rows]
+    const rounds = rows
 
-    rows = await db.getPlayersAndTotalScore(params.id)
-    const players = [...rows]
-
+    const players = await db.getPlayersAndTotalScore(params.id)
     for (const round of rounds) {
       for (const player of players) {
         rows = await db.getScoreByPlayerIdAndRoundId(params.id, player.id, round.id)
-        round.scores = round.scores === null ? [...rows] : [...round.scores, ...rows]
+        round.scores = round.scores === null ? rows : [...round.scores, ...rows]
       }
     }
 
     let colors = []
     players.forEach(() => colors = [...colors, randomColor()])
-    
     setResults({players, rounds, colors})
   }
 
@@ -98,7 +95,7 @@ export default function Results() {
 
       <Grid item xs={12} container justifyContent="end">
         <Button onClick={ handlerClickChangeFormat } variant="contained" startIcon={<PivotTableChartIcon />}>Change view</Button>
-      </Grid> 
+      </Grid>
 
       <Grid item xs={12} sx={{ overflow: 'auto' }}>
         <Switch>

@@ -1,5 +1,5 @@
-import { onMount, createSignal, Show } from 'solid-js'
-import { Link, useNavigate } from '@solidjs/router'
+import { onMount, createSignal, createMemo, Show, Switch, Match } from 'solid-js'
+import { Link, useNavigate, useLocation, useParams } from '@solidjs/router'
 
 import Grid from '@suid/material/Grid'
 import Button from '@suid/material/Button'
@@ -34,6 +34,8 @@ const style = {
 
 export default function NewGame() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const params = useParams()
   const [player, setPlayer] = createSignal('')
   const [players, setPlayers] = createSignal([])
   const [checked, setChecked] = createSignal([])
@@ -42,16 +44,45 @@ export default function NewGame() {
   const [updateUserId, setUpdateUserId] = createSignal(null)
   const [goalChecked, setGoalChecked] = createSignal(false)
   const [goal, setGoal] = createSignal('250')
+  const [isNewGame, setIsNewGame] = createSignal(true)
 
   onMount(async () => {
     const goal = await db.getSetting('GOAL')
     goal && setGoal(goal)
-    await getPlayers()
+    setPlayers(await db.getUsers())
+
+    if (location.pathname.indexOf('settings') > 0) {
+      setIsNewGame(false)
+      checkSettingPlayers()
+    }
   })
 
-  const getPlayers = async () => {
-    let users = await db.getUsers()
-    setPlayers([...users])
+  const showHeadline = () => isNewGame() ? 'New game' : 'Settings'
+
+  const hasMinCountPlayers = () => {
+    if (checked().length < 2) {
+      setException(true)
+      return false
+    }
+    return true
+  }
+
+  const initGoal = async () => {
+    let g = null
+    if (goalChecked()) {
+      g = +goal() > 0 ? +goal() : null
+      await db.setSetting('GOAL', g.toString())
+    }
+    return g
+  }
+
+  const checkSettingPlayers = async () => {
+    const participants = await db.getPlayers(params.id)
+    let newChecked = players().map(v => {
+      if (participants.find(p => p.is_active && p.user_id === v.id))
+        return v.id
+    })
+    setChecked(newChecked.filter(v => v))
   }
 
   const handleToggle = (value) => () => {
@@ -68,17 +99,11 @@ export default function NewGame() {
   }
 
   const handleCreateGame = async () => {
-    if (checked().length < 2) {
-      setException(true)
+    if (!hasMinCountPlayers()) {
       return
     }
 
-    let g = null
-    if (goalChecked()) {
-      g = +goal() > 0 ? +goal() : null
-      await db.setSetting('GOAL', g.toString())
-    }
-
+    const g = await initGoal()
     const newGameId = await db.addGame(g)
     if (!newGameId) {
       return
@@ -86,6 +111,31 @@ export default function NewGame() {
     checked().forEach(async value => await db.addPlayer(newGameId, value))
 
     navigate(`${prefix}/game/${newGameId}/round`)
+  }
+
+  const handleApplySettings = async () => {
+    if (!hasMinCountPlayers()) {
+      return
+    }
+
+    await initGoal()
+    const participants = await db.getPlayers(params.id)
+    for (let p of players()) {
+      let selected = checked().find(v => v === p.id)
+      let participant = participants.find(v => v.user_id === p.id)
+      if (selected && !participant) {
+        // add player to game
+        await db.addPlayer(params.id, p.id)
+      } else if (selected && participant && !participant.is_active) {
+        // return player to game
+        await db.updateActivityPlayer(participant.id, +true)
+      } else if (!selected && participant) {
+        // remove player from game
+        await db.updateActivityPlayer(participant.id, +false)
+      }
+    }
+    // update goal
+    navigate(`${prefix}/game/${params.id}/round`)
   }
 
   const handleModalOpen = () => setOpen(true)
@@ -134,7 +184,7 @@ export default function NewGame() {
   return <>
     <Grid container alignContent="center" rowSpacing={2} sx={{ mt: 1 }}>
       <Grid item xs={12} container justifyContent="center">
-        <Typography variant="h4" component="h1">New game</Typography>
+        <Typography variant="h4" component="h1">{ showHeadline() }</Typography>
       </Grid>
 
       <Grid item xs={12} container justifyContent="end">
@@ -189,13 +239,30 @@ export default function NewGame() {
       </Grid>
 
       <Grid item xs={12} container justifyContent="center">
-        <Button onClick={ handleCreateGame } sx={{ minWidth: '200px' }} variant="contained" color="success">Start the Game</Button>
+        <Switch>
+          <Match when={isNewGame()}>
+            <Button onClick={ handleCreateGame } sx={{ minWidth: '200px' }} variant="contained" color="success">Start the Game</Button>
+          </Match>
+          <Match when={!isNewGame()}>
+            <Button onClick={ handleApplySettings } sx={{ minWidth: '200px' }} variant="contained" color="success">Apply</Button>
+          </Match>
+        </Switch>
       </Grid>
 
       <Grid item xs={12} container justifyContent="center">
-        <Link class="btn-link" href={`${prefix}/`}>
-          <Button sx={{ minWidth: '200px' }} variant="outlined">Main Menu</Button>
-        </Link>
+        <Switch>
+          <Match when={isNewGame()}>
+            <Link class="btn-link" href={`${prefix}/`}>
+              <Button sx={{ minWidth: '200px' }} variant="outlined">Main Menu</Button>
+            </Link>
+          </Match>
+          <Match when={!isNewGame()}>
+            <Link class="btn-link" href={`${prefix}/game/${params.id}/round`}>
+              <Button sx={{ minWidth: '200px' }} variant="outlined">Back</Button>
+            </Link>
+          </Match>
+        </Switch>
+        
       </Grid>
     </Grid>
 

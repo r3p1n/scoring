@@ -12,6 +12,7 @@ import TableRow from '@suid/material/TableRow'
 import TableCell from '@suid/material/TableCell'
 import TextField from '@suid/material/TextField'
 import Alert from '@suid/material/Alert'
+import SettingsIcon from '@suid/icons-material/Settings'
 
 import { prefix } from '../router'
 import db from '../mixins/database'
@@ -72,7 +73,7 @@ export default function Round() {
     scores.forEach(async score => await db.addScore(newRoundId, score.player_id, score.score))
     return true
   }
-  
+
   const handlerChangeScores = id => event => {
     const newScore = +event.target.value.replace(/[^0-9]/g, '')
     const lastRoundScore = scores.find(score => score.player_id === id).last_round_score
@@ -126,10 +127,18 @@ export default function Round() {
     await getScore(params.id)
   }
 
+  const handlerSettings = () => {
+    navigate(`${prefix}/game/${params.id}/settings`)
+  }
+
   return <>
     <Grid container alignContent="center" rowSpacing={2} sx={{ mt: 1 }}>
       <Grid item xs={12} container justifyContent="center">
         <Typography variant="h4" component="h1">Round { roundNumber() }</Typography>
+      </Grid>
+
+      <Grid item xs={12} container justifyContent="end">
+        <Button onClick={ handlerSettings } variant="contained" startIcon={<SettingsIcon />}>Settings</Button>
       </Grid>
 
       <Grid item xs={12}>

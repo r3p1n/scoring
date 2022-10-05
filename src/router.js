@@ -9,7 +9,7 @@ export const routes = [
   },
   {
     path: prefix +'/new-game',
-    component: lazy(() => import('./pages/NewGame'))
+    component: lazy(() => import('./pages/Game'))
   },
   {
     path: prefix +'/continue',
@@ -26,6 +26,10 @@ export const routes = [
   {
     path: prefix +'/game/:id/results',
     component: lazy(() => import('./pages/Results'))
+  },
+  {
+    path: prefix +'/game/:id/settings',
+    component: lazy(() => import('./pages/Game'))
   },
   {
     path: prefix +'/*',

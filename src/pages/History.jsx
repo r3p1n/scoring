@@ -44,8 +44,8 @@ export default function History() {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Number</TableCell>
-              <TableCell>Started at</TableCell>
+              <TableCell>#</TableCell>
+              <TableCell>Finished at</TableCell>
               <TableCell>Goal</TableCell>
               <TableCell></TableCell>
             </TableRow>
@@ -55,7 +55,7 @@ export default function History() {
               return <>
                 <TableRow key={ game.id }>
                   <TableCell>{ game.id }</TableCell>
-                  <TableCell>{ formatDatetime(game.created_at) }</TableCell>
+                  <TableCell>{ formatDatetime(game.finished_at) }</TableCell>
                   <TableCell>{ game.goal }</TableCell>
                   <TableCell align="right">
                     <Link class="btn-link" href={`${prefix}/game/${game.id}/results`}>
