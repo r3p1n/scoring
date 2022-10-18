@@ -57,9 +57,9 @@ export default function History() {
                   <TableCell>{ game.id }</TableCell>
                   <TableCell>{ formatDatetime(game.finished_at) }</TableCell>
                   <TableCell>{ game.goal }</TableCell>
-                  <TableCell align="right">
+                  <TableCell align="center">
                     <Link class="btn-link" href={`${prefix}/game/${game.id}/results`}>
-                      <Button variant="contained">Result</Button>
+                      <Button variant="contained">Stats</Button>
                     </Link>
                   </TableCell>
                 </TableRow>

@@ -13,8 +13,9 @@ import Modal from '@suid/material/Modal'
 import Typography from '@suid/material/Typography'
 import TextField from '@suid/material/TextField'
 import Alert from '@suid/material/Alert'
-import IconButton from '@suid/material/IconButton'
 import FormControlLabel from '@suid/material/FormControlLabel'
+import IconButton from '@suid/material/IconButton'
+
 import EditIcon from '@suid/icons-material/Edit'
 import PlaylistAddIcon from '@suid/icons-material/PlaylistAdd'
 

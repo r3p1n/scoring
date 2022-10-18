@@ -12,11 +12,28 @@ import TableRow from '@suid/material/TableRow'
 import TableCell from '@suid/material/TableCell'
 import TextField from '@suid/material/TextField'
 import Alert from '@suid/material/Alert'
+import Modal from '@suid/material/Modal'
+import Paper from '@suid/material/Paper'
+import IconButton from '@suid/material/IconButton'
+import Stack from '@suid/material/Stack'
+
 import SettingsIcon from '@suid/icons-material/Settings'
-import QueryStatsIcon from '@suid/icons-material/QueryStats';
+import QueryStatsIcon from '@suid/icons-material/QueryStats'
+import EditIcon from '@suid/icons-material/Edit'
 
 import { prefix } from '../router'
 import db from '../mixins/database'
+
+const style = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 310,
+  bgcolor: 'background.paper',
+  boxShadow: 24,
+  p: 4,
+}
 
 export default function Round() {
   const params = useParams()
@@ -24,8 +41,11 @@ export default function Round() {
   const [roundNumber, setRoundNumber] = createSignal(0)
   const [gameNotFound, setGameNotFound] = createSignal(false)
   const [emptyScore, setEmptyScore] = createSignal(false)
-  const [scores, setScores] = createStore([])
   const [goal, setGoal] = createSignal(0)
+  const [openModal, setOpenModal] = createSignal(false)
+  const [modalParams, setModalParams] = createSignal({ playerId: 0, score: 0 })
+  const [multiplier, setMultiplier] = createSignal(1)
+  const [scores, setScores] = createStore([])
 
   onMount(async () => {
     if (await isFinishedGame(params.id)) {
@@ -68,22 +88,11 @@ export default function Round() {
     if (!newRoundId) {
       return false
     }
-    scores.forEach(async score => await db.addScore(newRoundId, score.player_id, score.score))
+    scores.forEach(async score => await db.addScore(newRoundId, score.player_id, calcScore(score.score, multiplier())))
     return true
   }
 
-  const handlerChangeScores = id => event => {
-    const newScore = +event.target.value.replace(/[^0-9]/g, '')
-    const lastRoundScore = scores.find(score => score.player_id === id).last_round_score
-    setScores(score => score.player_id === id, 'score', newScore)
-    setScores(score => score.player_id === id, 'total_score', lastRoundScore + newScore)
-    setEmptyScore(false)
-    if (newScore === 0 && event.target.selectionStart === 0) {
-      const end = event.target.value.length
-      event.target.focus()
-      event.target.setSelectionRange(end, end)
-    }
-  }
+  const calcScore = (score, multiplier) => score * multiplier
 
   const handlerClickFinishGame = async () => {
     if (isNotEmptyScore()) {
@@ -123,6 +132,12 @@ export default function Round() {
     }
     await getRound(params.id)
     await getScore(params.id)
+    setMultiplier(1)
+  }
+
+  const handlerSetMultiplier = () => {
+    const mult = multiplier() + 1
+    setMultiplier(mult <= 5 ? mult : 1)
   }
 
   const handlerStats = () => {
@@ -133,6 +148,33 @@ export default function Round() {
     navigate(`${prefix}/game/${params.id}/settings`)
   }
 
+  const handleOpenModal = params => event => {
+    setModalParams(params)
+    setOpenModal(true)
+  }
+  
+  const handleCloseModal = () => {
+    setOpenModal(false)
+  }
+
+  const handleSetModalScore = () => {
+    const lastRoundScore = scores.find(score => score.player_id === modalParams().playerId).last_round_score
+    setScores(score => score.player_id === modalParams().playerId, 'score', modalParams().score)
+    setScores(score => score.player_id === modalParams().playerId, 'total_score', lastRoundScore + modalParams().score)
+    setEmptyScore(false)
+    handleCloseModal()
+  }
+
+  const handlerChangeModalScores = id => event => {
+    const newScore = +event.target.value.replace(/[^0-9]/g, '')
+    if (newScore === 0 && event.target.selectionStart === 0) {
+      const end = event.target.value.length
+      event.target.focus()
+      event.target.setSelectionRange(end, end)
+    }
+    setModalParams({ playerId: id, score: newScore })
+  }
+
   return <>
     <Grid container alignContent="center" rowSpacing={2} sx={{ mt: 1 }}>
       <Grid item xs={12} container justifyContent="center">
@@ -140,8 +182,15 @@ export default function Round() {
       </Grid>
 
       <Grid item xs={12} container justifyContent="end">
-        <Button onClick={ handlerStats } variant="contained" startIcon={<QueryStatsIcon />} sx={{ mr: 1 }}>Stats</Button>
-        <Button onClick={ handlerSettings } variant="contained" startIcon={<SettingsIcon />}>Settings</Button>
+        <Stack direction="row" spacing={3}>
+          <IconButton onClick={ handlerSetMultiplier } edge="end" color="primary">x{ multiplier() }</IconButton>
+          <IconButton onClick={ handlerStats } edge="end" color="primary">
+            <QueryStatsIcon />
+          </IconButton>
+          <IconButton onClick={ handlerSettings } edge="end" color="primary">
+            <SettingsIcon />
+          </IconButton>
+        </Stack>
       </Grid>
 
       <Grid item xs={12}>
@@ -149,8 +198,8 @@ export default function Round() {
           <TableHead>
             <TableRow>
               <TableCell>Player</TableCell>
-              <TableCell align="right">Score by round</TableCell>
-              <TableCell align="right">Total score</TableCell>
+              <TableCell align="right">Score</TableCell>
+              <TableCell align="center"></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -158,27 +207,35 @@ export default function Round() {
               return <>
                 <TableRow key={ score.player_id }>
                   <TableCell>{ score.player_name }</TableCell>
-                  <TableCell align="right">
-                    <TextField value={ score.score.toString() }
-                      key={ score.player_id }
-                      onChange={ handlerChangeScores(score.player_id) }
-                      sx={{ maxWidth: '120px' }}
-                      inputProps={{ inputMode: 'numeric' }}
-                    />
+                  <TableCell sx={{ minWidth: '120px' }} align="right">
+                    <Show when={multiplier() > 1} fallback={ score.score }>
+                      { score.score } x { multiplier() } = { calcScore(score.score, multiplier()) }
+                    </Show>
+                    <hr />
+                    Total: { score.total_score }
                   </TableCell>
-                  <TableCell align="right">{ score.total_score.toString() }</TableCell>
+                  <TableCell sx={{ p: 0 }} align="center">
+                    <IconButton onClick={ handleOpenModal({ playerId: score.player_id, score: score.score }) } edge="end" color="primary">
+                      <EditIcon />
+                    </IconButton>
+                  </TableCell>
                 </TableRow>
               </>
             }) }
+
+            <Show when={goal() > 0}>
+              <TableRow>
+                <TableCell></TableCell>
+                <TableCell align="right">
+                  <Typography variant="subtitle2">Goal: { goal() }</Typography>
+                </TableCell>
+                <TableCell></TableCell>
+              </TableRow>
+            </Show>
+
           </TableBody>
         </Table>
       </Grid>
-
-      <Show when={goal() > 0}>
-        <Grid item xs={12} container justifyContent="end">
-          <Typography variant="subtitle2">Goal: { goal() }</Typography>
-        </Grid>
-      </Show>
 
       <Show when={emptyScore()}>
         <Grid item xs={12} container justifyContent="center">
@@ -208,5 +265,32 @@ export default function Round() {
         </Link>
       </Grid>
     </Grid>
+
+    <Modal
+      open={ openModal() }
+      onClose={ handleCloseModal }
+      aria-labelledby="modal-modal-title"
+    >
+      <Paper sx={ style }>
+        <Grid container justifyContent="center" alignItems="center" alignContent="center" spacing={ 1 }>
+          <Typography id="modal-modal-title" variant="h6" component="h2">Set Score</Typography>
+
+          <Grid item xs={12}>
+            <TextField sx={{ width: '100%' }}
+              label="Score"
+              variant="outlined"
+              inputProps={{ inputMode: 'numeric' }}
+              value={ modalParams().score.toString() }
+              onChange={ handlerChangeModalScores(modalParams().playerId) }
+            />
+          </Grid>
+
+          <Grid item xs={12} container justifyContent="end">
+            <Button onClick={ handleCloseModal } sx={{ minWidth: '100px', marginRight: '1rem' }} >Close</Button>
+            <Button onClick={ handleSetModalScore } sx={{ minWidth: '100px' }} variant="contained">Apply</Button>
+          </Grid>
+        </Grid>
+      </Paper>
+    </Modal>
   </>
 }
