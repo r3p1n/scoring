@@ -45,6 +45,7 @@ export default function Round() {
   const [openModal, setOpenModal] = createSignal(false)
   const [modalParams, setModalParams] = createSignal({ playerId: 0, score: 0 })
   const [multiplier, setMultiplier] = createSignal(1)
+  const [lastRoundMaxScorePlayerId, setLastRoundMaxScorePlayerId] = createSignal(0)
   const [scores, setScores] = createStore([])
 
   onMount(async () => {
@@ -53,16 +54,14 @@ export default function Round() {
     } else {
       await getRound(params.id)
       await getScore(params.id)
+      await getLastRoundMaxScorePlayerId(params.id)
       setGoal(await db.getGameGoal(params.id))
     }
   })
 
   const isFinishedGame = async (gameId) => {
-    const rows = await db.getGameFinishedAt(gameId)
-    if (rows.length && rows[0].finished_at) {
-      return true
-    }
-    return false
+    const finishedAt = await db.getGameFinishedAt(gameId)
+    return finishedAt !== null
   }
 
   const getRound = async (gameId) => {
@@ -76,12 +75,25 @@ export default function Round() {
       setGameNotFound(true)
       return
     }
-    setScores([...rows])
+    setScores(rows)
+  }
+
+  const getLastRoundMaxScorePlayerId = async (gameId) => {
+    const rows = await db.getLastRoundMaxScore(gameId)
+    if (!rows.length) {
+      setLastRoundMaxScorePlayerId(0)
+    } else if (rows.length > 1) {
+      const id = rows.map(v => v.player_id)[getRndInteger(0, rows.length)]
+      setLastRoundMaxScorePlayerId(id)
+    } else {
+      setLastRoundMaxScorePlayerId(rows[0].player_id)
+    }
   }
 
   const isNotEmptyScore = () => scores.find(s => s.score !== 0)
   const isNotEmptyTotalScore = () => scores.find(s => s.total_score !== 0)
   const isGoalAchieved = () => scores.find(s => s.total_score > goal())
+  const getRndInteger = (min, max) => Math.floor(Math.random() * (max - min)) + min
 
   const saveRoundData = async (gameId) => {
     const newRoundId = await db.addRound(gameId, roundNumber())
@@ -93,6 +105,8 @@ export default function Round() {
   }
 
   const calcScore = (score, multiplier) => score * multiplier
+
+  const getRowBgColor = (playerId) => lastRoundMaxScorePlayerId() === playerId ? 'radial-gradient(circle, rgba(200,200,200,1) 0%, rgba(0,0,0,0) 100%)' : ''
 
   const handlerClickFinishGame = async () => {
     if (isNotEmptyScore()) {
@@ -205,7 +219,7 @@ export default function Round() {
           <TableBody>
             { scores.map(score => {
               return <>
-                <TableRow key={ score.player_id }>
+                <TableRow key={ score.player_id } sx={{ background: getRowBgColor(score.player_id) }}>
                   <TableCell>{ score.player_name }</TableCell>
                   <TableCell sx={{ minWidth: '120px' }} align="right">
                     <Show when={multiplier() > 1} fallback={ score.score }>

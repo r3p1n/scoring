@@ -30,7 +30,7 @@ export default function Continue() {
       setNoActiveGame(true)
       return
     }
-    setGames([...rows])
+    setGames(rows)
   }
 
   return <>

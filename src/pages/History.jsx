@@ -30,7 +30,7 @@ export default function History() {
       setNoFinishedGame(true)
       return
     }
-    setGames([...rows])
+    setGames(rows)
   }
 
   return <>

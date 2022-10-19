@@ -116,7 +116,7 @@ const addGame = async (goal) => {
 const getGameGoal = async (id) => {
   try {
     const result = await dbExec("SELECT goal FROM games WHERE id = ?", [id])
-    return result.rows.length ? result.rows[0].goal : 0 // result.rows
+    return result.rows.length ? result.rows[0].goal : 0
   } catch (e) {
     console.error(e)
     return 0
@@ -136,7 +136,7 @@ const updateGameGoal = async (id, goal) => {
 const getGameFinishedAt = async (id) => {
   try {
     const result = await dbExec("SELECT finished_at FROM games WHERE id = ?", [id])
-    return result.rows
+    return result.rows.length ? result.rows[0].finished_at : null
   } catch (e) {
     console.error(e)
     return []
@@ -156,7 +156,7 @@ const setGameFinishedAtNow = async (id) => {
 const getUnfinishedGames = async () => {
   try {
     const result = await dbExec("SELECT * FROM games WHERE finished_at is NULL ORDER BY created_at DESC")
-    return result.rows
+    return [...result.rows]
   } catch (e) {
     console.error(e)
     return []
@@ -166,7 +166,7 @@ const getUnfinishedGames = async () => {
 const getFinishedGames = async () => {
   try {
     const result = await dbExec("SELECT * FROM games WHERE finished_at is not NULL ORDER BY finished_at DESC")
-    return result.rows
+    return [...result.rows]
   } catch (e) {
     console.error(e)
     return []
@@ -275,10 +275,31 @@ const getLastRoundScore = async (gameId) => {
         WHERE g.id = ?
         GROUP BY p.id
     `, [gameId])
-    if (!result.rows.length) {
-      return []
-    }
-    return result.rows
+    return [...result.rows]
+  } catch (e) {
+    console.error(e)
+    return []
+  }
+}
+
+const getLastRoundMaxScore = async (gameId) => {
+  try {
+    // https://github.com/Greyslim helped with this
+    const result = await dbExec(`
+      SELECT s.* FROM games g
+        LEFT JOIN rounds r ON r.game_id = g.id
+        LEFT JOIN scores s ON s.round_id = r.id
+        WHERE g.id = ? AND (s.score, r.id) = (
+          SELECT MAX(s.score), r.id FROM games g
+            LEFT JOIN rounds r ON r.game_id = g.id
+            LEFT JOIN scores s ON s.round_id = r.id
+            WHERE g.id = ?
+            GROUP BY r.id
+            ORDER BY r.id DESC
+            LIMIT 1
+        )
+    `, [gameId, gameId])
+    return [...result.rows]
   } catch (e) {
     console.error(e)
     return []
@@ -403,6 +424,7 @@ export default {
 
   addScore,
   getLastRoundScore,
+  getLastRoundMaxScore,
 
   getPlayersAndTotalScoreAndScores,
   getRoundAndScoreByPlayerId,
