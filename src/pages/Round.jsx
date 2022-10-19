@@ -146,6 +146,7 @@ export default function Round() {
     }
     await getRound(params.id)
     await getScore(params.id)
+    await getLastRoundMaxScorePlayerId(params.id)
     setMultiplier(1)
   }
 

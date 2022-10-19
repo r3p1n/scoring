@@ -1,6 +1,6 @@
 {
   "name": "scoring",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "App for calc score",
   "scripts": {
     "dev": "vite --mode dev",
